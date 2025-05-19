@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:videogame_catalog/providers/game_providers.dart';
 import 'package:videogame_catalog/widgets/game_item.dart';
 import 'package:videogame_catalog/screens/cart_screen.dart';
+import 'package:videogame_catalog/screens/add_game_screen.dart';
 
 class GameStoreScreen extends StatefulWidget {
   const GameStoreScreen({Key? key}) : super(key: key);
@@ -72,6 +73,27 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
           ),
         ],
       ),
+      // Añadimos el botón flotante para agregar juegos
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(left: 10), // Margen a la izquierda 
+        child: Align(
+          alignment: Alignment.bottomLeft, // Alineamos a la izquierda
+          child: FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AddGameScreen(),
+                ),
+              );
+            },
+            backgroundColor: Theme.of(context).primaryColor,
+            child: const Icon(Icons.add),
+            tooltip: 'Agregar nuevo juego',
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat, // Establecemos la posición a la izquierda
       body: gameProvider.isLoading
           ? const Center(child: CircularProgressIndicator())
           : gameProvider.games.isEmpty
