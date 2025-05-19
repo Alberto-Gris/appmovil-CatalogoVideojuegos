@@ -1,0 +1,118 @@
+{
+  "games": [
+    {
+      "id": 1,
+      "name": "The Legend of Zelda: Breath of the Wild",
+      "developer": "Nintendo",
+      "imageLink": "https://assets.nintendo.com/image/upload/q_auto/f_auto/ncom/software/switch/70010000000025/7137262b5a64d921e193653f8aa0b722925abc5680380ca0e18a5cfd91697f58",
+      "description": "Una aventura de mundo abierto donde Link despierta de un largo sueño para derrotar a Ganon y salvar Hyrule.",
+      "price": 80,
+      "platforms": [
+        "Nintendo Switch",
+        "Wii U"
+      ],
+      "releaseDate": "2017-03-03"
+    },
+    {
+      "id": 2,
+      "name": "Elden Ring",
+      "developer": "FromSoftware",
+      "imageLink": "https://image.api.playstation.com/vulcan/ap/rnd/202110/2000/YMUoJUYNX0xWk6eTKuZLr5Iw.jpg",
+      "description": "Un juego de rol de acción en un mundo abierto, desarrollado en colaboración con George R.R. Martin.",
+      "platforms": [
+        "PlayStation 5",
+        "Xbox Series X/S",
+        "PC"
+      ],
+      "releaseDate": "2022-02-25"
+    },
+    {
+      "id": 3,
+      "name": "God of War (2018)",
+      "developer": "Santa Monica Studio",
+      "imageLink": "https://image.api.playstation.com/vulcan/img/rnd/202010/2217/LsaRVLF2IU2L1FNtu9d3MKLq.jpg",
+      "description": "Kratos se embarca en una nueva aventura en la mitología nórdica junto a su hijo Atreus.",
+      "platforms": [
+        "PlayStation 4",
+        "PC"
+      ],
+      "releaseDate": "2018-04-20"
+    },
+    {
+      "id": 4,
+      "name": "Halo Wars 2",
+      "developer": "The Creative Assembly, 343 Industries",
+      "imageLink": "https://img.redbull.com/images/c_fill,g_auto,w_850,h_566/q_auto:low,f_auto/redbullcom/2017/02/24/1331846395895_2/halo-wars-2",
+      "description": "Estrategia en tiempo real ambientada en el universo de Halo, donde lideras fuerzas del UNSC contra una nueva amenaza en el Arca.",
+      "platforms": [
+        "Xbox One",
+        "PC (Windows 10)"
+      ],
+      "releaseDate": "2017-02-17"
+    },
+    {
+      "id": 5,
+      "name": "Halo: Combat Evolved",
+      "developer": "Bungie",
+      "imageLink": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1064221/capsule_616x353.jpg?t=1634231276",
+      "description": "El inicio de la saga, donde el Jefe Maestro combate a las fuerzas del Covenant en el misterioso anillo Halo.",
+      "platforms": [
+        "Xbox",
+        "PC",
+        "Xbox 360 (Anniversary)",
+        "Xbox One (MCC)"
+      ],
+      "releaseDate": "2001-11-15"
+    },
+    {
+      "id": 6,
+      "name": "Halo 3",
+      "developer": "Bungie",
+      "imageLink": "https://store-images.s-microsoft.com/image/apps.58523.14183232939782852.b643400c-9b4c-45c3-bd3f-79af6fd6ba17.769e7607-bb66-47ae-9d3a-410c044c0e79?q=90&w=480&h=270",
+      "description": "Conclusión épica de la trilogía original, donde el Jefe Maestro y el Pacto luchan por el destino de la galaxia.",
+      "platforms": [
+        "Xbox 360",
+        "Xbox One (MCC)",
+        "PC (MCC)"
+      ],
+      "releaseDate": "2007-09-25"
+    },
+    {
+      "id": 7,
+      "name": "Halo 4",
+      "developer": "343 Industries",
+      "imageLink": "https://store-images.s-microsoft.com/image/apps.34314.14094852858730120.8475f7cf-0333-4f77-934d-36aa19e18c42.71453430-eaf2-491a-bdc7-5a92f2e983b0?q=90&w=480&h=270",
+      "description": "El regreso del Jefe Maestro en una nueva aventura enfrentando una antigua amenaza en un mundo misterioso.",
+      "platforms": [
+        "Xbox 360",
+        "Xbox One (MCC)",
+        "PC (MCC)"
+      ],
+      "releaseDate": "2012-11-06"
+    },
+    {
+      "id": 8,
+      "name": "Halo 5: Guardians",
+      "developer": "343 Industries",
+      "imageLink": "https://store-images.s-microsoft.com/image/apps.50236.69279545232152045.f1a4a87c-fcc9-4b7c-a620-f6c56eb2d5ad.f0eeb1d4-a30c-4a21-8bcb-46ed84669b5c?q=90&w=480&h=270",
+      "description": "Una nueva amenaza emerge y dos equipos de Spartans se enfrentan en una búsqueda para encontrar al Jefe Maestro.",
+      "platforms": [
+        "Xbox One"
+      ],
+      "releaseDate": "2015-10-27"
+    },
+    {
+      "id": 9,
+      "name": "Halo Infinite",
+      "developer": "343 Industries",
+      "imageLink": "https://store-images.s-microsoft.com/image/apps.50670.13727851868390641.c9cc5f66-aff8-406c-af6b-440838730be0.d205e025-5444-4eb1-ae46-571ae6895928?q=90&w=480&h=270",
+      "description": "El Jefe Maestro regresa en la entrega más ambiciosa de la saga, con un mundo abierto y multijugador gratuito.",
+      "platforms": [
+        "Xbox Series X/S",
+        "Xbox One",
+        "PC"
+      ],
+      "releaseDate": "2021-12-08"
+    }
+  ]
+}
