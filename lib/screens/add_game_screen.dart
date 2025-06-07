@@ -20,6 +20,13 @@ class _AddGameScreenState extends State<AddGameScreen> {
   final TextEditingController _platformsController = TextEditingController();
   final TextEditingController _releaseDateController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
+  final TextEditingController _stockController = TextEditingController();
+  
+  // Para manejo de media carousel
+  final List<MediaCarouselItem> _mediaItems = [];
+  final TextEditingController _mediaUrlController = TextEditingController();
+  final TextEditingController _mediaAltController = TextEditingController();
+  String _selectedMediaType = 'image';
   
   bool _isLoading = false;
 
@@ -32,7 +39,42 @@ class _AddGameScreenState extends State<AddGameScreen> {
     _platformsController.dispose();
     _releaseDateController.dispose();
     _priceController.dispose();
+    _stockController.dispose();
+    _mediaUrlController.dispose();
+    _mediaAltController.dispose();
     super.dispose();
+  }
+
+  void _addMediaItem() {
+    if (_mediaUrlController.text.isNotEmpty && _mediaAltController.text.isNotEmpty) {
+      setState(() {
+        _mediaItems.add(MediaCarouselItem(
+          type: _selectedMediaType,
+          url: _mediaUrlController.text,
+          alt: _mediaAltController.text,
+        ));
+        _mediaUrlController.clear();
+        _mediaAltController.clear();
+      });
+    }
+  }
+
+  void _removeMediaItem(int index) {
+    setState(() {
+      _mediaItems.removeAt(index);
+    });
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1970),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+    );
+    if (picked != null) {
+      _releaseDateController.text = picked.toIso8601String().split('T')[0];
+    }
   }
 
   void _saveGame() async {
@@ -45,45 +87,68 @@ class _AddGameScreenState extends State<AddGameScreen> {
     });
     
     try {
-      // Crear un ID único basado en la hora actual
-      final id = DateTime.now().millisecondsSinceEpoch;
+      // Generar ID único
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
       
-      // Convertir el texto de plataformas a una lista (separadas por comas)
+      // Procesar plataformas
       final platforms = _platformsController.text.split(',')
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
           .toList();
       
-      // Crear un nuevo modelo de juego
+      // Si no se agregaron media items, crear uno con la imagen principal
+      List<MediaCarouselItem> mediaCarousel = List.from(_mediaItems);
+      if (mediaCarousel.isEmpty && _imageLinkController.text.isNotEmpty) {
+        mediaCarousel.add(MediaCarouselItem(
+          type: 'image',
+          url: _imageLinkController.text,
+          alt: 'Portada del juego',
+        ));
+      }
+      
+      // Crear el modelo de juego
       final game = GameModel(
         id: id,
-        name: _nameController.text,
-        developer: _developerController.text,
-        imageLink: _imageLinkController.text,
-        description: _descriptionController.text,
+        name: _nameController.text.trim(),
+        developer: _developerController.text.trim(),
+        imageLink: _imageLinkController.text.trim(),
+        description: _descriptionController.text.trim(),
         platforms: platforms,
-        releaseDate: _releaseDateController.text,
+        releaseDate: _releaseDateController.text.trim(),
         price: double.tryParse(_priceController.text) ?? 0.0,
+        unitsInStock: int.tryParse(_stockController.text) ?? 0,
         quantity: 0,
+        mediaCarousel: mediaCarousel,
       );
       
-      // Guardarlo usando el provider
-      final success = await Provider.of<GameProviders>(context, listen: false).saveGame(game);
+      // Guardar usando el provider
+      final gameProvider = Provider.of<GameProviders>(context, listen: false);
+      final success = await gameProvider.saveGame(game);
       
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Juego guardado correctamente')),
+          const SnackBar(
+            content: Text('✅ Juego guardado correctamente'),
+            backgroundColor: Colors.green,
+          ),
         );
-        Navigator.pop(context);
+        Navigator.pop(context, true); // Retornar true para indicar éxito
       } else if (mounted) {
+        final errorMessage = gameProvider.errorMessage ?? 'Error desconocido';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al guardar el juego')),
+          SnackBar(
+            content: Text('❌ Error: $errorMessage'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text('❌ Error inesperado: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -99,7 +164,8 @@ class _AddGameScreenState extends State<AddGameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agregar nuevo juego'),
+        title: const Text('Agregar Nuevo Juego'),
+        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -110,125 +176,239 @@ class _AddGameScreenState extends State<AddGameScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextFormField(
+                    // Información básica
+                    _buildSectionTitle('Información Básica'),
+                    _buildTextFormField(
                       controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre del juego',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingresa el nombre del juego';
-                        }
-                        return null;
-                      },
+                      label: 'Nombre del juego',
+                      validator: (value) => value?.isEmpty == true 
+                          ? 'Ingresa el nombre del juego' : null,
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
+                    _buildTextFormField(
                       controller: _developerController,
-                      decoration: const InputDecoration(
-                        labelText: 'Desarrollador',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingresa el desarrollador';
-                        }
-                        return null;
-                      },
+                      label: 'Desarrollador',
+                      validator: (value) => value?.isEmpty == true 
+                          ? 'Ingresa el desarrollador' : null,
                     ),
                     const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _imageLinkController,
-                      decoration: const InputDecoration(
-                        labelText: 'URL de la imagen',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingresa la URL de la imagen';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
+                    _buildTextFormField(
                       controller: _descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: 'Descripción',
-                        border: OutlineInputBorder(),
-                      ),
+                      label: 'Descripción',
                       maxLines: 3,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingresa una descripción';
-                        }
-                        return null;
-                      },
+                      validator: (value) => value?.isEmpty == true 
+                          ? 'Ingresa una descripción' : null,
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _platformsController,
-                      decoration: const InputDecoration(
-                        labelText: 'Plataformas (separadas por comas)',
-                        border: OutlineInputBorder(),
-                        hintText: 'PS5, Xbox, PC',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingresa al menos una plataforma';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _releaseDateController,
-                      decoration: const InputDecoration(
-                        labelText: 'Fecha de lanzamiento',
-                        border: OutlineInputBorder(),
-                        hintText: 'YYYY-MM-DD',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingresa la fecha de lanzamiento';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _priceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Precio',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingresa el precio';
-                        }
-                        if (double.tryParse(value) == null) {
-                          return 'Por favor ingresa un número válido';
-                        }
-                        return null;
-                      },
-                    ),
+                    
                     const SizedBox(height: 24),
+                    _buildSectionTitle('Detalles del Producto'),
+                    _buildTextFormField(
+                      controller: _platformsController,
+                      label: 'Plataformas (separadas por comas)',
+                      hintText: 'Nintendo Switch, PS5, Xbox Series X',
+                      validator: (value) => value?.isEmpty == true 
+                          ? 'Ingresa al menos una plataforma' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    GestureDetector(
+                      onTap: _selectDate,
+                      child: AbsorbPointer(
+                        child: _buildTextFormField(
+                          controller: _releaseDateController,
+                          label: 'Fecha de lanzamiento',
+                          hintText: 'Toca para seleccionar fecha',
+                          suffixIcon: const Icon(Icons.calendar_today),
+                          validator: (value) => value?.isEmpty == true 
+                              ? 'Selecciona la fecha de lanzamiento' : null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextFormField(
+                            controller: _priceController,
+                            label: 'Precio (\$)',
+                            keyboardType: TextInputType.number,
+                            validator: (value) {
+                              if (value?.isEmpty == true) return 'Ingresa el precio';
+                              if (double.tryParse(value!) == null) return 'Precio inválido';
+                              return null;
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildTextFormField(
+                            controller: _stockController,
+                            label: 'Stock disponible',
+                            keyboardType: TextInputType.number,
+                            validator: (value) {
+                              if (value?.isEmpty == true) return 'Ingresa el stock';
+                              if (int.tryParse(value!) == null) return 'Stock inválido';
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Imagen Principal'),
+                    _buildTextFormField(
+                      controller: _imageLinkController,
+                      label: 'URL de la imagen principal',
+                      validator: (value) => value?.isEmpty == true 
+                          ? 'Ingresa la URL de la imagen' : null,
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Galería de Medios (Opcional)'),
+                    _buildMediaSection(),
+                    
+                    const SizedBox(height: 32),
                     ElevatedButton(
                       onPressed: _saveGame,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: Theme.of(context).primaryColor,
+                        foregroundColor: Colors.white,
                       ),
                       child: const Text(
                         'GUARDAR JUEGO',
-                        style: TextStyle(fontSize: 16),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextFormField({
+    required TextEditingController controller,
+    required String label,
+    String? hintText,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    Widget? suffixIcon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        border: const OutlineInputBorder(),
+        suffixIcon: suffixIcon,
+      ),
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      validator: validator,
+    );
+  }
+
+  Widget _buildMediaSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Formulario para agregar media
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                DropdownButtonFormField<String>(
+                  value: _selectedMediaType,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de media',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'image', child: Text('Imagen')),
+                    DropdownMenuItem(value: 'video', child: Text('Video')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedMediaType = value!;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _mediaUrlController,
+                  decoration: const InputDecoration(
+                    labelText: 'URL del archivo',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _mediaAltController,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción alternativa',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _addMediaItem,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Agregar Media'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Lista de media items agregados
+        if (_mediaItems.isNotEmpty) ...[
+          const Text(
+            'Archivos agregados:',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          ...List.generate(_mediaItems.length, (index) {
+            final item = _mediaItems[index];
+            return Card(
+              child: ListTile(
+                leading: Icon(
+                  item.type == 'image' ? Icons.image : Icons.videocam,
+                  color: item.type == 'image' ? Colors.blue : Colors.red,
+                ),
+                title: Text(item.alt),
+                subtitle: Text(
+                  item.url,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _removeMediaItem(index),
+                ),
+              ),
+            );
+          }),
+        ],
+      ],
     );
   }
 }
