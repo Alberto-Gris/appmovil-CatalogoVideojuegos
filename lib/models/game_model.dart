@@ -34,7 +34,7 @@ class MediaCarouselItem {
 }
 
 class GameModel {
-  dynamic id; // Puede ser int o String dependiendo de la API
+  dynamic id;
   String name;
   String developer;
   String imageLink;
@@ -155,3 +155,4 @@ class GameModel {
   @override
   int get hashCode => id.hashCode;
 }
+
