@@ -9,7 +9,7 @@ import 'package:videogame_catalog/screens/login_screen.dart';
 class GameItem extends StatelessWidget {
   final GameModel game;
 
-  const GameItem({Key? key, required this.game}) : super(key: key);
+  const GameItem({super.key, required this.game});
 
   void _showLoginDialog(BuildContext context) {
     showDialog(
@@ -52,17 +52,29 @@ class GameItem extends StatelessWidget {
       return;
     }
 
-    // Si está autenticado, agregar al carrito
+    // Intentar agregar al carrito
     gameProvider.addToCart(game);
 
-    // Mostrar mensaje de confirmación
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${game.name} agregado al carrito'),
-        duration: const Duration(seconds: 2),
-        backgroundColor: Colors.green,
-      ),
-    );
+    // Verificar si hubo algún error después de intentar agregar
+    if (gameProvider.errorMessage != null) {
+      // Mostrar mensaje de error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(gameProvider.errorMessage!),
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } else {
+      // Solo mostrar mensaje de éxito si no hubo errores
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${game.name} agregado al carrito'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   void _handleRemoveFromCart(BuildContext context) {
@@ -78,6 +90,51 @@ class GameItem extends StatelessWidget {
     );
   }
 
+  void _handleToggleFavorite(BuildContext context) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final gameProvider = Provider.of<GameProviders>(context, listen: false);
+
+    if (!authProvider.isAuthenticated) {
+      _showLoginDialog(context);
+      return;
+    }
+
+    final gameId = game.id.toString();
+
+    // Alternar favorito
+    final success = await authProvider.toggleFavorite(gameId);
+
+    if (success) {
+      // Actualizar el estado local del juego
+      final isFavorite = authProvider.isGameFavorite(gameId);
+      gameProvider.updateGameFavoriteStatus(gameId, isFavorite);
+
+      // Mostrar mensaje de confirmación
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isFavorite
+                ? '${game.name} agregado a favoritos'
+                : '${game.name} removido de favoritos',
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: isFavorite ? Colors.red : Colors.grey,
+        ),
+      );
+    } else {
+      // Mostrar mensaje de error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            authProvider.errorMessage ?? 'Error al actualizar favoritos',
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer2<GameProviders, AuthProvider>(
@@ -85,6 +142,8 @@ class GameItem extends StatelessWidget {
         final inCart = gameProvider.isInCart(game);
         final quantity = gameProvider.getQuantityInCart(game);
         final canPurchase = authProvider.canPurchase;
+        final isFavorite = authProvider.isGameFavorite(game.id.toString());
+        final isLoadingFavorite = authProvider.isLoading;
 
         return GestureDetector(
           onTap: () {
@@ -101,37 +160,79 @@ class GameItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Imagen del juego
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Hero(
-                    tag: 'game-image-${game.id}',
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        image: DecorationImage(
-                          image: NetworkImage(game.imageLink),
-                          fit: BoxFit.cover,
+                // Imagen del juego con botón de favorito
+                Stack(
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Hero(
+                        tag: 'game-image-${game.id}',
+                        child: Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            image: DecorationImage(
+                              image: NetworkImage(game.imageLink),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          // Overlay si no puede comprar
+                          child:
+                              !canPurchase
+                                  ? Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.3),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.lock,
+                                        color: Colors.white,
+                                        size: 32,
+                                      ),
+                                    ),
+                                  )
+                                  : null,
                         ),
                       ),
-                      // Overlay si no puede comprar
-                      child:
-                          !canPurchase
-                              ? Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.3),
-                                ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.lock,
-                                    color: Colors.white,
-                                    size: 32,
-                                  ),
-                                ),
-                              )
-                              : null,
                     ),
-                  ),
+
+                    // Botón de favorito en la esquina superior derecha
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: IconButton(
+                          icon:
+                              isLoadingFavorite
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                  : Icon(
+                                    isFavorite
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color:
+                                        isFavorite ? Colors.red : Colors.white,
+                                    size: 24,
+                                  ),
+                          onPressed:
+                              isLoadingFavorite
+                                  ? null
+                                  : () => _handleToggleFavorite(context),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
                 Padding(
@@ -139,13 +240,25 @@ class GameItem extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Título del juego
-                      Text(
-                        game.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      // Título del juego con indicador de favorito
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              game.name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          if (isFavorite && authProvider.isAuthenticated)
+                            const Icon(
+                              Icons.favorite,
+                              color: Colors.red,
+                              size: 16,
+                            ),
+                        ],
                       ),
 
                       const SizedBox(height: 6),
@@ -192,7 +305,7 @@ class GameItem extends StatelessWidget {
 
                       const SizedBox(height: 12),
 
-                      // Precio y botón de carrito
+                      // Precio y botones de acción
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -205,49 +318,89 @@ class GameItem extends StatelessWidget {
                             ),
                           ),
 
-                          // Botones de carrito
-                          canPurchase
-                              ? Row(
-                                children: [
-                                  if (inCart)
-                                    Row(
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.remove),
-                                          onPressed:
-                                              () => _handleRemoveFromCart(
-                                                context,
-                                              ),
-                                        ),
-                                        Text(
-                                          '$quantity',
-                                          style: const TextStyle(fontSize: 16),
-                                        ),
-                                      ],
-                                    ),
-                                  IconButton(
-                                    icon: Icon(
-                                      inCart ? Icons.add : Icons.shopping_cart,
-                                      color: Colors.blue,
-                                    ),
-                                    onPressed: () => _handleAddToCart(context),
-                                  ),
-                                ],
-                              )
-                              : ElevatedButton.icon(
-                                onPressed: () => _showLoginDialog(context),
-                                icon: const Icon(Icons.login, size: 16),
-                                label: const Text('Iniciar Sesión'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  foregroundColor: Colors.white,
-                                  textStyle: const TextStyle(fontSize: 12),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
+                          // Botones de carrito y favorito
+                          Row(
+                            children: [
+                              // Botón de favorito (solo si está autenticado)
+                              if (authProvider.isAuthenticated)
+                                IconButton(
+                                  icon:
+                                      isLoadingFavorite
+                                          ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                          : Icon(
+                                            isFavorite
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
+                                            color:
+                                                isFavorite
+                                                    ? Colors.red
+                                                    : Colors.grey,
+                                          ),
+                                  onPressed:
+                                      isLoadingFavorite
+                                          ? null
+                                          : () =>
+                                              _handleToggleFavorite(context),
                                 ),
-                              ),
+
+                              const SizedBox(width: 8),
+
+                              // Botones de carrito
+                              canPurchase
+                                  ? Row(
+                                    children: [
+                                      if (inCart)
+                                        Row(
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.remove),
+                                              onPressed:
+                                                  () => _handleRemoveFromCart(
+                                                    context,
+                                                  ),
+                                            ),
+                                            Text(
+                                              '$quantity',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      IconButton(
+                                        icon: Icon(
+                                          inCart
+                                              ? Icons.add
+                                              : Icons.shopping_cart,
+                                          color: Colors.blue,
+                                        ),
+                                        onPressed:
+                                            () => _handleAddToCart(context),
+                                      ),
+                                    ],
+                                  )
+                                  : ElevatedButton.icon(
+                                    onPressed: () => _showLoginDialog(context),
+                                    icon: const Icon(Icons.login, size: 16),
+                                    label: const Text('Iniciar Sesión'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange,
+                                      foregroundColor: Colors.white,
+                                      textStyle: const TextStyle(fontSize: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                    ),
+                                  ),
+                            ],
+                          ),
                         ],
                       ),
 
@@ -272,7 +425,7 @@ class GameItem extends StatelessWidget {
                                 const SizedBox(width: 6),
                                 const Expanded(
                                   child: Text(
-                                    'Inicia sesión para comprar',
+                                    'Inicia sesión para comprar y agregar favoritos',
                                     style: TextStyle(fontSize: 12),
                                   ),
                                 ),

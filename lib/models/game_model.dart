@@ -21,11 +21,7 @@ class MediaCarouselItem {
   }
 
   Map<String, dynamic> toJSON() {
-    final json = {
-      'type': type,
-      'url': url,
-      'alt': alt,
-    };
+    final json = {'type': type, 'url': url, 'alt': alt};
     if (thumbnail != null) {
       json['thumbnail'] = thumbnail!;
     }
@@ -45,6 +41,7 @@ class GameModel {
   int quantity; // Para el carrito
   int? unitsInStock; // Stock disponible
   List<MediaCarouselItem> mediaCarousel;
+  bool isFavorite; // Nuevo campo para indicar si es favorito
 
   GameModel({
     required this.id,
@@ -58,6 +55,7 @@ class GameModel {
     this.quantity = 0,
     this.unitsInStock,
     this.mediaCarousel = const [],
+    this.isFavorite = false, // Por defecto no es favorito
   });
 
   factory GameModel.fromJSON(Map<String, dynamic> json) {
@@ -65,9 +63,14 @@ class GameModel {
     List<MediaCarouselItem> carousel = [];
     if (json['mediaCarousel'] != null) {
       if (json['mediaCarousel'] is List) {
-        carousel = (json['mediaCarousel'] as List)
-            .map((item) => MediaCarouselItem.fromJSON(item is Map<String, dynamic> ? item : {}))
-            .toList();
+        carousel =
+            (json['mediaCarousel'] as List)
+                .map(
+                  (item) => MediaCarouselItem.fromJSON(
+                    item is Map<String, dynamic> ? item : {},
+                  ),
+                )
+                .toList();
       }
     }
 
@@ -77,15 +80,24 @@ class GameModel {
       developer: json['developer'] ?? '',
       imageLink: json['imageLink'] ?? '',
       description: json['description'] ?? '',
-      platforms: json['platforms'] != null 
-          ? List<String>.from(json['platforms']) 
-          : [],
+      platforms:
+          json['platforms'] != null ? List<String>.from(json['platforms']) : [],
       releaseDate: json['releaseDate'] ?? '',
       price: _parsePrice(json['price']),
       quantity: json['quantity'] ?? 0,
       unitsInStock: json['unitsInStock'],
       mediaCarousel: carousel,
+      isFavorite: json['isFavorite'] ?? false,
     );
+  }
+
+  // Factory constructor para crear un juego marcado como favorito
+  factory GameModel.fromJSONWithFavoriteStatus(
+    Map<String, dynamic> json,
+    bool isFavorite,
+  ) {
+    final game = GameModel.fromJSON(json);
+    return game.copyWith(isFavorite: isFavorite);
   }
 
   // Helper method para parsear el precio de forma segura
@@ -109,6 +121,7 @@ class GameModel {
       'price': price,
       if (unitsInStock != null) 'unitsInStock': unitsInStock,
       'mediaCarousel': mediaCarousel.map((item) => item.toJSON()).toList(),
+      'isFavorite': isFavorite,
     };
   }
 
@@ -125,6 +138,7 @@ class GameModel {
     int? quantity,
     int? unitsInStock,
     List<MediaCarouselItem>? mediaCarousel,
+    bool? isFavorite,
   }) {
     return GameModel(
       id: id ?? this.id,
@@ -138,12 +152,28 @@ class GameModel {
       quantity: quantity ?? this.quantity,
       unitsInStock: unitsInStock ?? this.unitsInStock,
       mediaCarousel: mediaCarousel ?? this.mediaCarousel,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
+  }
+
+  // Método para cambiar el estado de favorito
+  GameModel toggleFavorite() {
+    return copyWith(isFavorite: !isFavorite);
+  }
+
+  // Método para marcar como favorito
+  GameModel markAsFavorite() {
+    return copyWith(isFavorite: true);
+  }
+
+  // Método para desmarcar como favorito
+  GameModel unmarkAsFavorite() {
+    return copyWith(isFavorite: false);
   }
 
   @override
   String toString() {
-    return 'GameModel(id: $id, name: $name, developer: $developer, price: $price, stock: $unitsInStock)';
+    return 'GameModel(id: $id, name: $name, developer: $developer, price: $price, stock: $unitsInStock, isFavorite: $isFavorite)';
   }
 
   @override
@@ -155,4 +185,3 @@ class GameModel {
   @override
   int get hashCode => id.hashCode;
 }
-

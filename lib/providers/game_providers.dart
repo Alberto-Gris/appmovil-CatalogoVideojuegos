@@ -14,10 +14,11 @@ class GameProviders extends ChangeNotifier {
 
   // Filtros y búsqueda
   String _searchQuery = '';
-  List<String> _selectedPlatforms = [];
+  final List<String> _selectedPlatforms = [];
   double _minPrice = 0.0;
   double _maxPrice = double.infinity;
   bool _onlyInStock = false;
+  bool _showOnlyFavorites = false; // Nuevo filtro para mostrar solo favoritos
 
   static const String _baseUrl = 'https://684495cb71eb5d1be033aad0.mockapi.io';
 
@@ -27,9 +28,10 @@ class GameProviders extends ChangeNotifier {
   double get minPrice => _minPrice;
   double get maxPrice => _maxPrice;
   bool get onlyInStock => _onlyInStock;
+  bool get showOnlyFavorites => _showOnlyFavorites;
 
-  // Getter para juegos filtrados
-  List<GameModel> get filteredGames {
+  // Getter para juegos filtrados (ahora incluye filtro de favoritos)
+  List<GameModel> getFilteredGames(AuthProvider? authProvider) {
     return games.where((game) {
       // Filtro por búsqueda de texto
       if (_searchQuery.isNotEmpty) {
@@ -67,9 +69,19 @@ class GameProviders extends ChangeNotifier {
         return false;
       }
 
+      // Filtro por favoritos
+      if (_showOnlyFavorites && authProvider != null) {
+        if (!authProvider.isGameFavorite(game.id.toString())) {
+          return false;
+        }
+      }
+
       return true;
     }).toList();
   }
+
+  // Getter para mantener compatibilidad (sin filtro de favoritos)
+  List<GameModel> get filteredGames => getFilteredGames(null);
 
   // Obtener todas las plataformas disponibles
   List<String> get availablePlatforms {
@@ -95,7 +107,8 @@ class GameProviders extends ChangeNotifier {
     return {'min': min, 'max': max};
   }
 
-  Future<void> fetchGames() async {
+  // Método actualizado para sincronizar favoritos con el estado de autenticación
+  Future<void> fetchGames([AuthProvider? authProvider]) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
@@ -110,17 +123,25 @@ class GameProviders extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        List<GameModel> fetchedGames = [];
 
         if (data is Map<String, dynamic> && data.containsKey('games')) {
-          games = List<GameModel>.from(
+          fetchedGames = List<GameModel>.from(
             data['games'].map((game) => GameModel.fromJSON(game)),
           );
         } else if (data is List) {
-          games = List<GameModel>.from(
+          fetchedGames = List<GameModel>.from(
             data.map((game) => GameModel.fromJSON(game)),
           );
         } else {
           throw Exception('Formato de respuesta inesperado');
+        }
+
+        // Sincronizar estado de favoritos si hay un usuario autenticado
+        if (authProvider != null && authProvider.isAuthenticated) {
+          games = _syncFavoritesStatus(fetchedGames, authProvider);
+        } else {
+          games = fetchedGames;
         }
       } else {
         throw Exception('Error del servidor: ${response.statusCode}');
@@ -137,7 +158,36 @@ class GameProviders extends ChangeNotifier {
     }
   }
 
-  // Métodos de filtrado
+  // Sincronizar el estado de favoritos de los juegos con los favoritos del usuario
+  List<GameModel> _syncFavoritesStatus(
+    List<GameModel> gamesList,
+    AuthProvider authProvider,
+  ) {
+    return gamesList.map((game) {
+      final isFavorite = authProvider.isGameFavorite(game.id.toString());
+      return game.copyWith(isFavorite: isFavorite);
+    }).toList();
+  }
+
+  // Actualizar el estado de favorito de un juego específico
+  void updateGameFavoriteStatus(String gameId, bool isFavorite) {
+    final gameIndex = games.indexWhere((g) => g.id.toString() == gameId);
+    if (gameIndex >= 0) {
+      games[gameIndex] = games[gameIndex].copyWith(isFavorite: isFavorite);
+      notifyListeners();
+    }
+  }
+
+  // Obtener juegos favoritos del usuario actual
+  List<GameModel> getFavoriteGames(AuthProvider authProvider) {
+    if (!authProvider.isAuthenticated) return [];
+
+    return games
+        .where((game) => authProvider.isGameFavorite(game.id.toString()))
+        .toList();
+  }
+
+  // Métodos de filtrado actualizados
   void setSearchQuery(String query) {
     _searchQuery = query;
     notifyListeners();
@@ -163,12 +213,19 @@ class GameProviders extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Nuevo método para filtrar solo favoritos
+  void setShowOnlyFavorites(bool value) {
+    _showOnlyFavorites = value;
+    notifyListeners();
+  }
+
   void clearFilters() {
     _searchQuery = '';
     _selectedPlatforms.clear();
     _minPrice = 0.0;
     _maxPrice = double.infinity;
     _onlyInStock = false;
+    _showOnlyFavorites = false;
     notifyListeners();
   }
 
@@ -199,6 +256,7 @@ class GameProviders extends ChangeNotifier {
           quantity: 1,
           mediaCarousel: game.mediaCarousel,
           unitsInStock: game.unitsInStock,
+          isFavorite: game.isFavorite, // Mantener estado de favorito
         );
         cartGames.add(gameToAdd);
       } else {
@@ -368,7 +426,7 @@ class GameProviders extends ChangeNotifier {
   // Obtener un juego por ID
   GameModel? getGameById(String id) {
     try {
-      return games.firstWhere((game) => game.id == id);
+      return games.firstWhere((game) => game.id.toString() == id);
     } catch (e) {
       return null;
     }
@@ -389,14 +447,15 @@ class GameProviders extends ChangeNotifier {
         .toList();
   }
 
-  // Obtener estadísticas del catálogo
-  Map<String, dynamic> get catalogStats {
+  // Obtener estadísticas del catálogo (actualizado con favoritos)
+  Map<String, dynamic> getCatalogStats(AuthProvider? authProvider) {
     if (games.isEmpty) {
       return {
         'totalGames': 0,
         'averagePrice': 0.0,
         'totalStock': 0,
         'outOfStockGames': 0,
+        'totalFavorites': 0,
         'topPlatforms': <String>[],
         'topDevelopers': <String>[],
       };
@@ -410,6 +469,11 @@ class GameProviders extends ChangeNotifier {
         games.where((game) => (game.unitsInStock ?? 0) <= 0).length;
     final averagePrice =
         games.fold(0.0, (sum, game) => sum + game.price) / games.length;
+
+    final totalFavorites =
+        authProvider != null && authProvider.isAuthenticated
+            ? authProvider.favoritesCount
+            : 0;
 
     // Contar plataformas
     final platformCount = <String, int>{};
@@ -442,10 +506,14 @@ class GameProviders extends ChangeNotifier {
       'averagePrice': averagePrice,
       'totalStock': totalStock,
       'outOfStockGames': outOfStockGames,
+      'totalFavorites': totalFavorites,
       'topPlatforms': topPlatforms.map((e) => e.key).toList(),
       'topDevelopers': topDevelopers.map((e) => e.key).toList(),
     };
   }
+
+  // Getter para mantener compatibilidad
+  Map<String, dynamic> get catalogStats => getCatalogStats(null);
 
   // Limpiar mensaje de error
   void clearError() {
@@ -473,7 +541,7 @@ class GameProviders extends ChangeNotifier {
 
       // Verificar stock disponible antes de procesar
       for (final cartGame in cartGames) {
-        final currentGame = getGameById(cartGame.id);
+        final currentGame = getGameById(cartGame.id.toString());
         if (currentGame == null ||
             (currentGame.unitsInStock ?? 0) < cartGame.quantity) {
           errorMessage = 'Stock insuficiente para ${cartGame.name}';
@@ -535,7 +603,7 @@ class GameProviders extends ChangeNotifier {
   // Actualizar stock de un juego específico
   Future<bool> updateGameStock(String gameId, int newStock) async {
     try {
-      final gameIndex = games.indexWhere((g) => g.id == gameId);
+      final gameIndex = games.indexWhere((g) => g.id.toString() == gameId);
       if (gameIndex >= 0) {
         games[gameIndex] = games[gameIndex].copyWith(unitsInStock: newStock);
         return await updateGame(games[gameIndex]);
@@ -545,5 +613,16 @@ class GameProviders extends ChangeNotifier {
       errorMessage = 'Error al actualizar stock: $e';
       return false;
     }
+  }
+
+  // Método para refrescar los favoritos cuando el usuario cambie de sesión
+  void refreshFavoritesStatus(AuthProvider authProvider) {
+    if (authProvider.isAuthenticated) {
+      games = _syncFavoritesStatus(games, authProvider);
+    } else {
+      // Si no hay usuario autenticado, marcar todos como no favoritos
+      games = games.map((game) => game.copyWith(isFavorite: false)).toList();
+    }
+    notifyListeners();
   }
 }

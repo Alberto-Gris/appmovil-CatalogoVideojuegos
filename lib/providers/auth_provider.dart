@@ -355,4 +355,185 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // Obtener lista de favoritos del usuario actual
+  List<String> get userFavorites => _currentUser?.favorites ?? [];
+
+  // Verificar si un juego es favorito
+  bool isGameFavorite(String gameId) {
+    return _currentUser?.isFavorite(gameId) ?? false;
+  }
+
+  // Agregar juego a favoritos
+  Future<bool> addToFavorites(String gameId) async {
+    if (_currentUser == null || !_isAuthenticated) {
+      errorMessage = 'Debes iniciar sesión para agregar favoritos';
+      notifyListeners();
+      return false;
+    }
+
+    if (_currentUser!.isFavorite(gameId)) {
+      return true; // Ya está en favoritos
+    }
+
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final updatedUser = _currentUser!.addFavorite(gameId);
+
+      final url = Uri.parse('$_baseUrl/users/${_currentUser!.id}');
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(updatedUser.toJSON()),
+      );
+
+      if (response.statusCode == 200) {
+        _currentUser = updatedUser;
+
+        if (kDebugMode) {
+          print('Juego agregado a favoritos: $gameId');
+        }
+
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception('Error del servidor: ${response.statusCode}');
+      }
+    } catch (e) {
+      errorMessage = 'Error al agregar a favoritos: ${e.toString()}';
+
+      if (kDebugMode) {
+        print('Error en addToFavorites: $e');
+      }
+
+      notifyListeners();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Remover juego de favoritos
+  Future<bool> removeFromFavorites(String gameId) async {
+    if (_currentUser == null || !_isAuthenticated) {
+      errorMessage = 'Debes iniciar sesión para modificar favoritos';
+      notifyListeners();
+      return false;
+    }
+
+    if (!_currentUser!.isFavorite(gameId)) {
+      return true; // No está en favoritos
+    }
+
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final updatedUser = _currentUser!.removeFavorite(gameId);
+
+      final url = Uri.parse('$_baseUrl/users/${_currentUser!.id}');
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(updatedUser.toJSON()),
+      );
+
+      if (response.statusCode == 200) {
+        _currentUser = updatedUser;
+
+        if (kDebugMode) {
+          print('Juego removido de favoritos: $gameId');
+        }
+
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception('Error del servidor: ${response.statusCode}');
+      }
+    } catch (e) {
+      errorMessage = 'Error al remover de favoritos: ${e.toString()}';
+
+      if (kDebugMode) {
+        print('Error en removeFromFavorites: $e');
+      }
+
+      notifyListeners();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Alternar estado de favorito (agregar/remover)
+  Future<bool> toggleFavorite(String gameId) async {
+    if (_currentUser == null || !_isAuthenticated) {
+      errorMessage = 'Debes iniciar sesión para modificar favoritos';
+      notifyListeners();
+      return false;
+    }
+
+    if (_currentUser!.isFavorite(gameId)) {
+      return await removeFromFavorites(gameId);
+    } else {
+      return await addToFavorites(gameId);
+    }
+  }
+
+  // Obtener número de favoritos
+  int get favoritesCount => _currentUser?.favoritesCount ?? 0;
+
+  // Limpiar todos los favoritos
+  Future<bool> clearAllFavorites() async {
+    if (_currentUser == null || !_isAuthenticated) {
+      errorMessage = 'Debes iniciar sesión para modificar favoritos';
+      notifyListeners();
+      return false;
+    }
+
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final updatedUser = _currentUser!.copyWith(favorites: []);
+
+      final url = Uri.parse('$_baseUrl/users/${_currentUser!.id}');
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(updatedUser.toJSON()),
+      );
+
+      if (response.statusCode == 200) {
+        _currentUser = updatedUser;
+
+        if (kDebugMode) {
+          print('Todos los favoritos han sido removidos');
+        }
+
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception('Error del servidor: ${response.statusCode}');
+      }
+    } catch (e) {
+      errorMessage = 'Error al limpiar favoritos: ${e.toString()}';
+
+      if (kDebugMode) {
+        print('Error en clearAllFavorites: $e');
+      }
+
+      notifyListeners();
+      return false;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 }

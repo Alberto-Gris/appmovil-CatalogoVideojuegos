@@ -272,7 +272,6 @@ class _AddGameScreenState extends State<AddGameScreen> {
                       completer.complete(null);
                     }
                   } catch (e) {
-                    print('Error al seleccionar imagen: $e');
                     if (!completer.isCompleted) {
                       completer.complete(null);
                     }
@@ -304,7 +303,6 @@ class _AddGameScreenState extends State<AddGameScreen> {
                       completer.complete(null);
                     }
                   } catch (e) {
-                    print('Error al subir video: $e');
                     if (!completer.isCompleted) {
                       completer.complete(null);
                     }
