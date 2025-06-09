@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:videogame_catalog/models/game_model.dart';
 import 'package:videogame_catalog/providers/game_providers.dart';
+import 'package:videogame_catalog/providers/auth_provider.dart'; // Importar AuthProvider
 
 class CartScreen extends StatelessWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -9,6 +10,9 @@ class CartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gameProvider = Provider.of<GameProviders>(context);
+    final authProvider = Provider.of<AuthProvider>(
+      context,
+    ); // Agregar AuthProvider
     final cartGames = gameProvider.cartGames;
 
     return Scaffold(
@@ -21,119 +25,150 @@ class CartScreen extends StatelessWidget {
               onPressed: () {
                 showDialog(
                   context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Vaciar carrito'),
-                    content: const Text('¿Estás seguro de vaciar el carrito?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(ctx).pop();
-                        },
-                        child: const Text('No'),
+                  builder:
+                      (ctx) => AlertDialog(
+                        title: const Text('Vaciar carrito'),
+                        content: const Text(
+                          '¿Estás seguro de vaciar el carrito?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(ctx).pop();
+                            },
+                            child: const Text('No'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              gameProvider.clearCart();
+                              Navigator.of(ctx).pop();
+                            },
+                            child: const Text('Sí'),
+                          ),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: () {
-                          gameProvider.clearCart();
-                          Navigator.of(ctx).pop();
-                        },
-                        child: const Text('Sí'),
-                      ),
-                    ],
-                  ),
                 );
               },
             ),
         ],
       ),
-      body: cartGames.isEmpty
-          ? const Center(
-              child: Text(
-                'Tu carrito está vacío',
-                style: TextStyle(fontSize: 18),
-              ),
-            )
-          : Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: cartGames.length,
-                    itemBuilder: (context, index) {
-                      final game = cartGames[index];
-                      return CartItem(game: game);
-                    },
-                  ),
+      body:
+          cartGames.isEmpty
+              ? const Center(
+                child: Text(
+                  'Tu carrito está vacío',
+                  style: TextStyle(fontSize: 18),
                 ),
-                // Resumen del carrito
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.3),
-                        spreadRadius: 1,
-                        blurRadius: 5,
-                        offset: const Offset(0, -3),
-                      ),
-                    ],
+              )
+              : Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: cartGames.length,
+                      itemBuilder: (context, index) {
+                        final game = cartGames[index];
+                        return CartItem(game: game);
+                      },
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Total:',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            '\$${gameProvider.totalCartPrice.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            backgroundColor: Theme.of(context).primaryColor,
-                          ),
-                          onPressed: () {
-                            // Aquí iría la lógica de finalizar compra
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  '¡Compra realizada con éxito!',
-                                ),
-                                backgroundColor: Colors.green,
+                  // Resumen del carrito
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.3),
+                          spreadRadius: 1,
+                          blurRadius: 5,
+                          offset: const Offset(0, -3),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total:',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                            );
-                            gameProvider.clearCart();
-                            Navigator.pop(context);
-                          },
-                          child: const Text(
-                            'FINALIZAR COMPRA',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white,
                             ),
+                            Text(
+                              '\$${gameProvider.totalCartPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              backgroundColor: Theme.of(context).primaryColor,
+                            ),
+                            onPressed:
+                                gameProvider.isLoading
+                                    ? null
+                                    : () async {
+                                      // Llamar al método processCheckout
+                                      final success = await gameProvider
+                                          .processCheckout(authProvider);
+
+                                      if (success) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              '¡Compra realizada con éxito!',
+                                            ),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                        Navigator.pop(context);
+                                      } else {
+                                        // Mostrar error si la compra falló
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              gameProvider.errorMessage ??
+                                                  'Error al procesar la compra',
+                                            ),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    },
+                            child:
+                                gameProvider.isLoading
+                                    ? const CircularProgressIndicator(
+                                      color: Colors.white,
+                                    )
+                                    : const Text(
+                                      'FINALIZAR COMPRA',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
     );
   }
 }
@@ -165,9 +200,9 @@ class CartItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
-            
+
             const SizedBox(width: 12),
-            
+
             // Información del juego
             Expanded(
               child: Column(
@@ -183,10 +218,7 @@ class CartItem extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     game.developer,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -197,10 +229,20 @@ class CartItem extends StatelessWidget {
                       color: Colors.green,
                     ),
                   ),
+                  // Mostrar stock disponible
+                  if (game.unitsInStock != null)
+                    Text(
+                      'Stock: ${game.unitsInStock}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color:
+                            game.unitsInStock! > 0 ? Colors.green : Colors.red,
+                      ),
+                    ),
                 ],
               ),
             ),
-            
+
             // Controles de cantidad
             Column(
               children: [
@@ -221,9 +263,12 @@ class CartItem extends StatelessWidget {
                     ),
                     IconButton(
                       icon: const Icon(Icons.add),
-                      onPressed: () {
-                        gameProvider.addToCart(game);
-                      },
+                      onPressed:
+                          gameProvider.hasStockAvailable(game)
+                              ? () {
+                                gameProvider.addToCart(game);
+                              }
+                              : null, // Deshabilitar si no hay stock
                     ),
                   ],
                 ),

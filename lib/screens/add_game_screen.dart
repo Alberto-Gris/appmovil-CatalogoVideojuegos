@@ -9,7 +9,7 @@ import 'package:videogame_catalog/services/cloudinary_services.dart';
 class AddGameScreen extends StatefulWidget {
   final GameModel? gameToEdit;
 
-  const AddGameScreen({Key? key, this.gameToEdit}) : super(key: key);
+  const AddGameScreen({super.key, this.gameToEdit});
 
   @override
   State<AddGameScreen> createState() => _AddGameScreenState();

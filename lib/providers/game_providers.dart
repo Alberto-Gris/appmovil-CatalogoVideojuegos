@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:videogame_catalog/models/game_model.dart';
+import 'auth_provider.dart';
 
 class GameProviders extends ChangeNotifier {
   bool isLoading = false;
@@ -45,7 +46,9 @@ class GameProviders extends ChangeNotifier {
         bool hasMatchingPlatform = false;
         for (final platform in _selectedPlatforms) {
           if (game.platforms.any(
-              (gamePlatform) => gamePlatform.toLowerCase().contains(platform.toLowerCase()))) {
+            (gamePlatform) =>
+                gamePlatform.toLowerCase().contains(platform.toLowerCase()),
+          )) {
             hasMatchingPlatform = true;
             break;
           }
@@ -59,7 +62,8 @@ class GameProviders extends ChangeNotifier {
       }
 
       // Filtro por stock
-      if (_onlyInStock && (game.unitsInStock == null || game.unitsInStock! <= 0)) {
+      if (_onlyInStock &&
+          (game.unitsInStock == null || game.unitsInStock! <= 0)) {
         return false;
       }
 
@@ -79,15 +83,15 @@ class GameProviders extends ChangeNotifier {
   // Obtener rango de precios
   Map<String, double> get priceRange {
     if (games.isEmpty) return {'min': 0.0, 'max': 100.0};
-    
+
     double min = games.first.price;
     double max = games.first.price;
-    
+
     for (final game in games) {
       if (game.price < min) min = game.price;
       if (game.price > max) max = game.price;
     }
-    
+
     return {'min': min, 'max': max};
   }
 
@@ -106,7 +110,7 @@ class GameProviders extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         if (data is Map<String, dynamic> && data.containsKey('games')) {
           games = List<GameModel>.from(
             data['games'].map((game) => GameModel.fromJSON(game)),
@@ -203,7 +207,7 @@ class GameProviders extends ChangeNotifier {
         return;
       }
     }
-    
+
     _updateTotalPrice();
     errorMessage = null;
     notifyListeners();
@@ -219,7 +223,7 @@ class GameProviders extends ChangeNotifier {
       } else {
         cartGames.removeAt(existingIndex);
       }
-      
+
       _updateTotalPrice();
       notifyListeners();
     }
@@ -241,7 +245,10 @@ class GameProviders extends ChangeNotifier {
 
   // Actualizar el precio total del carrito
   void _updateTotalPrice() {
-    totalCartPrice = cartGames.fold(0.0, (sum, game) => sum + (game.price * game.quantity));
+    totalCartPrice = cartGames.fold(
+      0.0,
+      (sum, game) => sum + (game.price * game.quantity),
+    );
   }
 
   // Verificar si un juego está en el carrito
@@ -308,7 +315,7 @@ class GameProviders extends ChangeNotifier {
         final index = games.indexWhere((g) => g.id == game.id);
         if (index >= 0) {
           games[index] = game;
-          
+
           // También actualizar en el carrito si existe
           final cartIndex = cartGames.indexWhere((g) => g.id == game.id);
           if (cartIndex >= 0) {
@@ -316,7 +323,7 @@ class GameProviders extends ChangeNotifier {
             cartGames[cartIndex] = game.copyWith(quantity: currentQuantity);
             _updateTotalPrice();
           }
-          
+
           notifyListeners();
         }
         return true;
@@ -370,10 +377,14 @@ class GameProviders extends ChangeNotifier {
   // Obtener juegos relacionados (misma plataforma o desarrollador)
   List<GameModel> getRelatedGames(GameModel game, {int limit = 4}) {
     return games
-        .where((g) => 
-            g.id != game.id && 
-            (g.developer == game.developer || 
-             g.platforms.any((platform) => game.platforms.contains(platform))))
+        .where(
+          (g) =>
+              g.id != game.id &&
+              (g.developer == game.developer ||
+                  g.platforms.any(
+                    (platform) => game.platforms.contains(platform),
+                  )),
+        )
         .take(limit)
         .toList();
   }
@@ -391,9 +402,14 @@ class GameProviders extends ChangeNotifier {
       };
     }
 
-    final totalStock = games.fold(0, (sum, game) => sum + (game.unitsInStock ?? 0));
-    final outOfStockGames = games.where((game) => (game.unitsInStock ?? 0) <= 0).length;
-    final averagePrice = games.fold(0.0, (sum, game) => sum + game.price) / games.length;
+    final totalStock = games.fold(
+      0,
+      (sum, game) => sum + (game.unitsInStock ?? 0),
+    );
+    final outOfStockGames =
+        games.where((game) => (game.unitsInStock ?? 0) <= 0).length;
+    final averagePrice =
+        games.fold(0.0, (sum, game) => sum + game.price) / games.length;
 
     // Contar plataformas
     final platformCount = <String, int>{};
@@ -406,17 +422,20 @@ class GameProviders extends ChangeNotifier {
     // Contar desarrolladores
     final developerCount = <String, int>{};
     for (final game in games) {
-      developerCount[game.developer] = (developerCount[game.developer] ?? 0) + 1;
+      developerCount[game.developer] =
+          (developerCount[game.developer] ?? 0) + 1;
     }
 
     // Obtener top 5
-    final topPlatforms = platformCount.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value))
-      ..take(5);
+    final topPlatforms =
+        platformCount.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value))
+          ..take(5);
 
-    final topDevelopers = developerCount.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value))
-      ..take(5);
+    final topDevelopers =
+        developerCount.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value))
+          ..take(5);
 
     return {
       'totalGames': games.length,
@@ -435,9 +454,16 @@ class GameProviders extends ChangeNotifier {
   }
 
   // Simular compra (procesar carrito)
-  Future<bool> processCheckout() async {
+  Future<bool> processCheckout(AuthProvider authProvider) async {
     if (cartGames.isEmpty) {
       errorMessage = 'El carrito está vacío';
+      return false;
+    }
+
+    // Verificar autenticación antes de procesar
+    final authError = authProvider.validatePurchase();
+    if (authError != null) {
+      errorMessage = authError;
       return false;
     }
 
@@ -448,14 +474,14 @@ class GameProviders extends ChangeNotifier {
       // Verificar stock disponible antes de procesar
       for (final cartGame in cartGames) {
         final currentGame = getGameById(cartGame.id);
-        if (currentGame == null || 
+        if (currentGame == null ||
             (currentGame.unitsInStock ?? 0) < cartGame.quantity) {
           errorMessage = 'Stock insuficiente para ${cartGame.name}';
           return false;
         }
       }
 
-      // Simular procesamiento
+      // Simular procesamiento de pago
       await Future.delayed(const Duration(seconds: 2));
 
       // Actualizar stock de los juegos
@@ -464,15 +490,24 @@ class GameProviders extends ChangeNotifier {
         if (gameIndex >= 0) {
           final currentStock = games[gameIndex].unitsInStock ?? 0;
           final newStock = currentStock - cartGame.quantity;
-          
+
           // Crear nueva instancia con stock actualizado
           games[gameIndex] = games[gameIndex].copyWith(
-            unitsInStock: newStock >= 0 ? newStock : 0
+            unitsInStock: newStock >= 0 ? newStock : 0,
           );
 
-          // Actualizar en el servidor (opcional)
-          updateGame(games[gameIndex]);
+          // Actualizar en el servidor
+          await updateGame(games[gameIndex]);
         }
+      }
+
+      // Opcional: Registrar la compra con el usuario
+      if (kDebugMode) {
+        print('Compra procesada para usuario: ${authProvider.currentUserName}');
+        print('Total de la compra: \$${totalCartPrice.toStringAsFixed(2)}');
+        print(
+          'Juegos comprados: ${cartGames.map((g) => '${g.name} (x${g.quantity})').join(', ')}',
+        );
       }
 
       clearCart();
@@ -484,6 +519,17 @@ class GameProviders extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  bool canAddToCart(AuthProvider authProvider) {
+    return authProvider.isAuthenticated;
+  }
+
+  String getAddToCartMessage(AuthProvider authProvider) {
+    if (!authProvider.isAuthenticated) {
+      return 'Inicia sesión para agregar al carrito';
+    }
+    return 'Agregar al carrito';
   }
 
   // Actualizar stock de un juego específico
