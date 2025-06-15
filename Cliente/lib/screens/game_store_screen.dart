@@ -119,7 +119,7 @@ class _GameStoreScreenState extends State<GameStoreScreen>
                 ),
                 Tab(
                   icon: const Icon(Icons.camera_alt),
-                  text: 'Indentificación',
+                  text: 'Identificación',
                 ),
               ],
             ),
