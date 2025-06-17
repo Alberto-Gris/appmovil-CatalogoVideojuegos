@@ -1,17 +1,24 @@
-import 'dart:io'; //cambiar esta libreria en caso de querer usarlo con chrome
+import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class CloudinaryService {
-  static const String _cloudName = 'dbdkb85oh';
-  static const String _uploadPreset = 'upload';
-  static const String _apiKey = '511918764597653';
-  static const String _apiSecret = '2DFuBLLGE9hJWL2s-aZqKP3a8iQ';
+  static String get _cloudName => dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
+  static String get _uploadPreset =>
+      dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
+  static String get _apiKey => dotenv.env['CLOUDINARY_API_KEY'] ?? '';
+  static String get _apiSecret => dotenv.env['CLOUDINARY_API_SECRET'] ?? '';
 
-  static const String _baseUrl = 'https://api.cloudinary.com/v1_1/$_cloudName';
+  static String get _baseUrl => 'https://api.cloudinary.com/v1_1/$_cloudName';
+
+  // Inicializar las variables de entorno
+  static Future<void> initialize() async {
+    await dotenv.load(fileName: ".env");
+  }
 
   static Future<String?> uploadImage({bool fromCamera = false}) async {
     try {
@@ -39,7 +46,7 @@ class CloudinaryService {
       final ImagePicker picker = ImagePicker();
       final XFile? video = await picker.pickVideo(
         source: ImageSource.gallery,
-        maxDuration: const Duration(minutes: 5), // Máximo 5 minutos
+        maxDuration: const Duration(minutes: 5),
       );
 
       if (video == null) return null;
@@ -66,7 +73,15 @@ class CloudinaryService {
             result.files.single.extension?.toLowerCase() ?? '';
 
         String resourceType = 'auto';
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'].contains(extension)) {
+        if ([
+          'jpg',
+          'jpeg',
+          'png',
+          'gif',
+          'webp',
+          'bmp',
+          'tiff',
+        ].contains(extension)) {
           resourceType = 'image';
         } else if ([
           'mp4',
@@ -93,25 +108,23 @@ class CloudinaryService {
   // Función privada para subir archivo a Cloudinary
   static Future<String?> _uploadFile(File file, String resourceType) async {
     try {
-      print('=== INICIO UPLOAD CLOUDINARY ===');
-      print('Cloud name: $_cloudName');
-      print('Upload preset: $_uploadPreset');
-      print('Resource type: $resourceType');
-      print('File path: ${file.path}');
-      
+      // Verificar que las credenciales estén configuradas
+      if (!isConfigured()) {
+        throw Exception('Cloudinary no está configurado correctamente');
+      }
+
       // Verificar tamaño del archivo
       final fileSize = await file.length();
-      print('File size: ${fileSize} bytes (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
-      
-      final maxSize = resourceType == 'video' ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
-      
+      final maxSize =
+          resourceType == 'video' ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+
       if (fileSize > maxSize) {
-        throw Exception('El archivo es demasiado grande. Máximo ${resourceType == 'video' ? '100MB' : '10MB'}');
+        throw Exception(
+          'El archivo es demasiado grande. Máximo ${resourceType == 'video' ? '100MB' : '10MB'}',
+        );
       }
 
       final uri = Uri.parse('$_baseUrl/$resourceType/upload');
-      print('Upload URL: $uri');
-      
       final request = http.MultipartRequest('POST', uri);
 
       // Agregar el archivo
@@ -120,13 +133,12 @@ class CloudinaryService {
 
       // SOLO parámetros permitidos para unsigned upload
       request.fields['upload_preset'] = _uploadPreset;
-      
+
       print('Parámetros enviados:');
       request.fields.forEach((key, value) {
         print('  $key: $value');
       });
 
-      print('Enviando request...');
       final response = await request.send();
       final responseData = await response.stream.bytesToString();
 
@@ -151,6 +163,7 @@ class CloudinaryService {
       rethrow;
     }
   }
+
   // Obtener URL del thumbnail de un video
   static String getVideoThumbnail(String videoUrl) {
     try {
@@ -158,7 +171,6 @@ class CloudinaryService {
       final pathSegments = uri.pathSegments;
 
       if (pathSegments.length >= 3) {
-        // Encontrar el índice del resource_type
         int versionIndex = -1;
         for (int i = 0; i < pathSegments.length; i++) {
           if (pathSegments[i] == 'video') {
@@ -168,12 +180,9 @@ class CloudinaryService {
         }
 
         if (versionIndex != -1 && versionIndex + 2 < pathSegments.length) {
-          final publicId = pathSegments
-              .sublist(versionIndex + 2)
-              .join('/')
-              .split('.')
-              .first;
-          
+          final publicId =
+              pathSegments.sublist(versionIndex + 2).join('/').split('.').first;
+
           return 'https://res.cloudinary.com/$_cloudName/video/upload/w_300,h_200,c_fill,f_jpg,so_0/$publicId.jpg';
         }
       }
@@ -181,7 +190,7 @@ class CloudinaryService {
       print('Error generando thumbnail: $e');
     }
 
-    return videoUrl; // Fallback
+    return videoUrl;
   }
 
   // Extraer public_id de una URL de Cloudinary
@@ -190,7 +199,6 @@ class CloudinaryService {
       final uri = Uri.parse(url);
       final pathSegments = uri.pathSegments;
 
-      // Buscar el índice del tipo de recurso
       int resourceIndex = -1;
       for (int i = 0; i < pathSegments.length; i++) {
         if (['image', 'video', 'raw'].contains(pathSegments[i])) {
@@ -215,6 +223,8 @@ class CloudinaryService {
   // Eliminar archivo de Cloudinary
   static Future<bool> deleteFile(String publicId, String resourceType) async {
     try {
+      if (!isConfigured()) return false;
+
       final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final signature = _generateSignature({
         'public_id': publicId,
@@ -247,9 +257,8 @@ class CloudinaryService {
 
   // Generar firma para autenticación
   static String _generateSignature(Map<String, String> params) {
-    // Crear string de parámetros ordenados
     final sortedParams = Map.fromEntries(
-      params.entries.toList()..sort((a, b) => a.key.compareTo(b.key))
+      params.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
     );
 
     final paramsString = sortedParams.entries
@@ -257,25 +266,28 @@ class CloudinaryService {
         .join('&');
 
     final stringToSign = '$paramsString$_apiSecret';
-    
-    // Generar SHA1
     final bytes = utf8.encode(stringToSign);
     final digest = sha1.convert(bytes);
-    
+
     return digest.toString();
   }
 
   // Validar configuración
   static bool isConfigured() {
-    return _cloudName != 'TU_CLOUD_NAME' &&
-           _uploadPreset != 'TU_UPLOAD_PRESET' &&
-           _apiKey != 'TU_API_KEY' &&
-           _apiSecret != 'TU_API_SECRET';
+    return _cloudName.isNotEmpty &&
+        _uploadPreset.isNotEmpty &&
+        _apiKey.isNotEmpty &&
+        _apiSecret.isNotEmpty;
   }
 
   // Obtener información de un archivo
-  static Future<Map<String, dynamic>?> getFileInfo(String publicId, String resourceType) async {
+  static Future<Map<String, dynamic>?> getFileInfo(
+    String publicId,
+    String resourceType,
+  ) async {
     try {
+      if (!isConfigured()) return null;
+
       final uri = Uri.parse('$_baseUrl/resources/$resourceType/$publicId');
       final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final signature = _generateSignature({
@@ -284,11 +296,13 @@ class CloudinaryService {
       });
 
       final response = await http.get(
-        uri.replace(queryParameters: {
-          'api_key': _apiKey,
-          'timestamp': timestamp,
-          'signature': signature,
-        }),
+        uri.replace(
+          queryParameters: {
+            'api_key': _apiKey,
+            'timestamp': timestamp,
+            'signature': signature,
+          },
+        ),
       );
 
       if (response.statusCode == 200) {

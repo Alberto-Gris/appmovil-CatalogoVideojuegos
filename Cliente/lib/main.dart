@@ -2,8 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:videogame_catalog/providers/game_providers.dart';
 import 'package:videogame_catalog/screens/game_store_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-void main() {
+void main() async {
+  // Asegurar que los bindings de Flutter estén inicializados
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    // Cargar las variables de entorno desde el archivo .env
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    // Manejar error si el archivo .env no existe o tiene problemas
+    debugPrint('❌ Error cargando .env: $e');
+    debugPrint(
+      'Asegúrate de que el archivo .env existe en la raíz del proyecto',
+    );
+  }
+
   runApp(const MyApp());
 }
 
